@@ -1,1 +1,4 @@
-"# project11a-mobile-tickets" 
+# Android App
+
+## Описание
+Андроид-приложение. Работает с API (Python backend) и предоставляет пользовательский интерфейс.
