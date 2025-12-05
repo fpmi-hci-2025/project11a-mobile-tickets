@@ -28,43 +28,93 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.compose.*
 import com.example.tickets.R
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(nav: NavHostController) {
+
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
 
     var from by remember { mutableStateOf("") }
     var to by remember { mutableStateOf("") }
     var dateStart by remember { mutableStateOf("26/09/2025") }
     var dateEnd by remember { mutableStateOf("26/09/2025") }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                modifier = Modifier.height(48.dp),
-                title = { Text("") },
-                navigationIcon = {
-                    IconButton(onClick = { /* TODO: открыть меню */ }) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.ic_menu),   // бургер
-                            contentDescription = "Menu"
-                        )
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { /* TODO: профиль */ }) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.ic_profile), // круглая аватарка
-                            contentDescription = "Profile"
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color(0xFFEAD0C2)
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            ModalDrawerSheet(
+                drawerShape = RoundedCornerShape(0.dp),
+                modifier = Modifier.width(260.dp)
+            ) {
+
+                Text(
+                    "Меню",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp),
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold
                 )
-            )
+
+                DrawerButton("Найти билеты") {
+                    scope.launch { drawerState.close() }
+                    nav.navigate("search")
+                }
+
+                DrawerButton("Техподдержка") {
+                    scope.launch { drawerState.close() }
+                    nav.navigate("support")
+                }
+
+                DrawerButton("Все акции") {
+                    scope.launch { drawerState.close() }
+                    nav.navigate("promo")
+                }
+
+                DrawerButton("Профиль") {
+                    scope.launch { drawerState.close() }
+                    nav.navigate("profile")
+                }
+            }
         }
-    ) { padding ->
+    ) {
+
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    modifier = Modifier.height(48.dp),
+                    title = { Text("") },
+                    navigationIcon = {
+                        IconButton(
+                            onClick = {
+                                scope.launch {
+                                    drawerState.open()
+                                }
+                            }
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_menu),
+                                contentDescription = "Menu"
+                            )
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = { nav.navigate("profile") }) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_profile),
+                                contentDescription = "Profile"
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color(0xFFEAD0C2)
+                    )
+                )
+            }
+        ) { padding ->
 
         Column(
             modifier = Modifier
@@ -152,17 +202,8 @@ fun MainScreen(nav: NavHostController) {
 
             Spacer(Modifier.height(16.dp))
 
-            /* PromoItem("Скидка 10%", "Скидка 10% на билеты ...") {
-                 nav.navigate("promo_1")
-             }
+            PromoBlock(nav)
 
-             PromoItem("2 билета по цене 1", "Выгодное предложение ...") {
-                 nav.navigate("promo_2")
-             }*/
-            PromoBlock(
-                onPromo1 = { nav.navigate("promo_1") },
-                onPromo2 = { nav.navigate("promo_2") }
-            )
 
             Spacer(Modifier.height(16.dp))
 
@@ -178,6 +219,5 @@ fun MainScreen(nav: NavHostController) {
                 Text("Все акции")
             }
         }
-    }
-}
+    } }}
 
