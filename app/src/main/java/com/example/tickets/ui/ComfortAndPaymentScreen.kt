@@ -1,39 +1,55 @@
 package com.example.tickets.ui
-import android.os.Bundle
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
-import androidx.compose.foundation.Image
+
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
-import androidx.navigation.compose.rememberNavController
-import androidx.navigation.compose.*
-import com.example.tickets.R
+import com.example.tickets.data.DatabaseModule
+import com.example.tickets.data.entity.RouteEntity
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ComfortAndPaymentScreen(nav: NavHostController) {
+fun ComfortAndPaymentScreen(routeId: Long, nav: NavHostController) {
+    val repository = DatabaseModule.getRepository()
+    var route by remember { mutableStateOf<RouteEntity?>(null) }
+    var isLoading by remember { mutableStateOf(true) }
+    var totalPrice by remember { mutableStateOf(0.0) }
+    
+    LaunchedEffect(routeId) {
+        if (routeId > 0) {
+            isLoading = true
+            CoroutineScope(Dispatchers.IO).launch {
+                val loadedRoute = repository.getRouteById(routeId)
+                CoroutineScope(Dispatchers.Main).launch {
+                    route = loadedRoute
+                    isLoading = false
+                    // Извлекаем числовое значение цены для расчетов
+                    route?.price?.let { priceStr ->
+                        val priceValue = priceStr.replace(",", ".").replace(" BYN", "").toDoubleOrNull() ?: 0.0
+                        totalPrice = priceValue
+                    }
+                }
+            }
+        } else {
+            isLoading = false
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -41,7 +57,7 @@ fun ComfortAndPaymentScreen(nav: NavHostController) {
                 title = { Text("Выберите места") },
                 navigationIcon = {
                     IconButton(onClick = { nav.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -58,8 +74,18 @@ fun ComfortAndPaymentScreen(nav: NavHostController) {
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
-
-            TicketSummaryCard()   // Короткая сводка билета
+            if (isLoading) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = Color(0xFF622A3A))
+                }
+            } else {
+                route?.let { TicketSummaryCard(it) }   // Короткая сводка билета
+            }
 
             Spacer(Modifier.height(24.dp))
 
@@ -105,7 +131,11 @@ fun ComfortAndPaymentScreen(nav: NavHostController) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text("Продолжить", fontSize = 17.sp, color = Color.White)
-                    Text("12,36 BYN", fontWeight = FontWeight.Bold, color = Color.White)
+                    Text(
+                        route?.price ?: "0 BYN",
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
                 }
             }
 

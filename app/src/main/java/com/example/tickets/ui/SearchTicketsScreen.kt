@@ -1,53 +1,120 @@
 package com.example.tickets.ui
-import android.os.Bundle
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
-import androidx.compose.foundation.Image
+
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.ArrowForward
-import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
-import androidx.navigation.compose.rememberNavController
-import androidx.navigation.compose.*
-import com.example.tickets.R
+import com.example.tickets.data.DatabaseModule
+import com.example.tickets.data.entity.RouteEntity
+
+/**
+ * Преобразует дату из формата DD/MM/YYYY в DD.MM.YYYY
+ */
+fun convertDateFormat(date: String): String {
+    return if (date.contains("/")) {
+        date.replace("/", ".")
+    } else {
+        date
+    }
+}
 
 @Composable
-fun SearchTicketsScreen(nav: NavHostController) {
+fun SearchTicketsScreen(
+    initialFrom: String = "",
+    initialTo: String = "",
+    initialDateStart: String = "",
+    initialDateEnd: String = "",
+    nav: NavHostController
+) {
+    val repository = DatabaseModule.getRepository()
+    
+    var from by remember { mutableStateOf(initialFrom) }
+    var to by remember { mutableStateOf(initialTo) }
+    var date by remember { mutableStateOf(initialDateStart) }
+    var dateStart by remember { mutableStateOf(convertDateFormat(initialDateStart)) }
+    var dateEnd by remember { mutableStateOf(convertDateFormat(initialDateEnd)) }
+    var isSearching by remember { mutableStateOf(initialFrom.isNotBlank() || initialTo.isNotBlank()) }
+    
+    // Состояния для фильтров и сортировки
+    var showFiltersDialog by remember { mutableStateOf(false) }
+    var showSortDialog by remember { mutableStateOf(false) }
+    var sortType by remember { mutableStateOf("time") } // time, price, duration, seats
+    var filterTrainType by remember { mutableStateOf<String?>(null) }
+    var filterMinSeats by remember { mutableStateOf(0) }
 
-    var from by remember { mutableStateOf("") }
-    var to by remember { mutableStateOf("") }
-    var date by remember { mutableStateOf("") }
+    // Получаем все рейсы по умолчанию
+    val allRoutes by repository.getAllRoutes().collectAsState(initial = emptyList())
 
-    val tickets = listOf(
-        Triple("Минск — Гродно", "12.12.2025", "17.90 BYN"),
-        Triple("Минск — Брест", "11.01.2026", "21.40 BYN"),
-        Triple("Гродно — Витебск", "03.02.2026", "30.10 BYN"),
-    )
+    // Результаты поиска по маршруту
+    val searchResults by remember(from, to) {
+        repository.searchRoutes(from.trim(), to.trim())
+    }.collectAsState(initial = emptyList())
+    // Результаты поиска по маршруту и дате
+    val searchResultsByDate by repository.searchRoutesByDate(from, to, convertDateFormat(date)).collectAsState(initial = emptyList())
+    
+    // Результаты поиска по диапазону дат
+    val searchResultsByDateRange by repository.searchRoutesByDateRange(from, to, dateStart, dateEnd).collectAsState(initial = emptyList())
+    
+    // Определяем какие рейсы показывать
+    val routesList = remember(allRoutes, searchResults, searchResultsByDate, from, to, date) {
+        val hasSearchTerms = from.isNotBlank() || to.isNotBlank()
+        val hasDate = date.isNotBlank()
+
+        when {
+            // If user typed city AND date
+            hasSearchTerms && hasDate -> searchResultsByDate
+
+            // If user only typed cities
+            hasSearchTerms -> searchResults
+
+            // If everything is empty, show all
+            else -> allRoutes
+        }
+    }
+    
+    // Применяем фильтры и сортировку
+    val filteredAndSortedRoutes = remember(routesList, sortType, filterTrainType, filterMinSeats) {
+        var result = routesList
+        
+        // Применяем фильтры
+        if (filterTrainType != null) {
+            result = result.filter { it.trainType == filterTrainType }
+        }
+        if (filterMinSeats > 0) {
+            result = result.filter { it.availableSeats >= filterMinSeats }
+        }
+        
+        // Применяем сортировку
+        result = when (sortType) {
+            "price" -> result.sortedBy { 
+                it.price.replace(",", ".").replace(" BYN", "").toDoubleOrNull() ?: 0.0 
+            }
+            "price_desc" -> result.sortedByDescending { 
+                it.price.replace(",", ".").replace(" BYN", "").toDoubleOrNull() ?: 0.0 
+            }
+            "time" -> result.sortedWith(compareBy({ it.departureDate }, { it.departureTime }))
+            "time_desc" -> result.sortedWith(compareBy({ it.departureDate }, { it.departureTime })).reversed()
+            "seats" -> result.sortedByDescending { it.availableSeats }
+            else -> result
+        }
+        
+        result
+    }
 
     Column(
         modifier = Modifier
@@ -100,27 +167,33 @@ fun SearchTicketsScreen(nav: NavHostController) {
 
                 Spacer(Modifier.height(8.dp))
 
-                OutlinedTextField(
+                /*OutlinedTextField(
                     value = date,
                     onValueChange = { date = it },
                     label = { Text("Дата") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
-                )
+                )*/
+                Button(
+                    onClick = {
+                        isSearching = true
+                        // Обновляем дату для поиска
+                        if (date.isBlank() && dateStart.isNotBlank()) {
+                            date = dateStart
+                        }
+                        // Поиск выполняется автоматически через Flow
+                    },
+                    Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(Color(0xFF622A3A)),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Поиск", textAlign = TextAlign.Center)
+                }
             }
 
             Spacer(Modifier.width(12.dp))
 
-            Button(
-                onClick = { /* TODO */ },
-                modifier = Modifier
-                    .height(with(LocalDensity.current) { fieldsHeight.toDp() })  // кнопка = высота полей
-                    .width(90.dp),
-                colors = ButtonDefaults.buttonColors(Color(0xFF622A3A)),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text("Поиск", textAlign = TextAlign.Center)
-            }
+
         }
 
         Spacer(Modifier.height(20.dp))
@@ -130,7 +203,7 @@ fun SearchTicketsScreen(nav: NavHostController) {
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Button(
-                onClick = { /* TODO */ },
+                onClick = { showFiltersDialog = true },
                 colors = ButtonDefaults.buttonColors(Color(0xFF622A3A)),
                 modifier = Modifier.weight(1f)
             ) {
@@ -140,22 +213,67 @@ fun SearchTicketsScreen(nav: NavHostController) {
             Spacer(Modifier.width(12.dp))
 
             Button(
-                onClick = { /* TODO */ },
+                onClick = { showSortDialog = true },
                 colors = ButtonDefaults.buttonColors(Color(0xFF622A3A)),
                 modifier = Modifier.weight(1f)
             ) {
                 Text("Сортировка")
             }
         }
+        
+        // Диалог фильтров
+        if (showFiltersDialog) {
+            FiltersDialog(
+                trainType = filterTrainType,
+                minSeats = filterMinSeats,
+                onTrainTypeChange = { filterTrainType = it },
+                onMinSeatsChange = { filterMinSeats = it },
+                onDismiss = { showFiltersDialog = false },
+                onApply = { showFiltersDialog = false }
+            )
+        }
+        
+        // Диалог сортировки
+        if (showSortDialog) {
+            SortDialog(
+                currentSort = sortType,
+                onSortSelected = { sortType = it },
+                onDismiss = { showSortDialog = false }
+            )
+        }
 
         Spacer(Modifier.height(20.dp))
 
-        LazyColumn(
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.fillMaxSize()
-        ) {
-            items(tickets) { (route, dateString, price) ->
-                TicketCard(route, dateString, price, nav)
+        if (filteredAndSortedRoutes.isEmpty() && isSearching) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(Color(0xFFD2AC97))
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        "Рейсы не найдены",
+                        textAlign = TextAlign.Center,
+                        color = Color.Gray,
+                        fontSize = 16.sp
+                    )
+                }
+            }
+        } else {
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.fillMaxSize()
+            ) {
+                items(filteredAndSortedRoutes) { route ->
+                    RouteCard(route, nav)
+                }
             }
         }
     }
@@ -163,13 +281,13 @@ fun SearchTicketsScreen(nav: NavHostController) {
 
 
 @Composable
-fun TicketCard(route: String, date: String, price: String, nav: NavHostController) {
+fun RouteCard(route: RouteEntity, nav: NavHostController) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .height(100.dp),
         onClick = {
-            nav.navigate("ticket_details/$route/$date/$price")
+            nav.navigate("ticket_details/${route.id}")
         },
         colors = CardDefaults.cardColors(Color(0xFFD2AC97)),
         shape = RoundedCornerShape(16.dp)
@@ -183,13 +301,20 @@ fun TicketCard(route: String, date: String, price: String, nav: NavHostControlle
         ) {
 
             Column {
-                Text(route, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                Text(route.route, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                 Spacer(Modifier.height(6.dp))
-                Text(date)
+                Text("${route.departureDate} ${route.departureTime}")
+                if (route.availableSeats > 0) {
+                    Text(
+                        "Свободных мест: ${route.availableSeats}",
+                        fontSize = 12.sp,
+                        color = Color.Gray
+                    )
+                }
             }
 
             Column(horizontalAlignment = Alignment.End) {
-                Text(price, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                Text(route.price, fontWeight = FontWeight.Bold, fontSize = 20.sp)
                 Spacer(Modifier.height(4.dp))
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowForward,

@@ -39,8 +39,14 @@ fun MainScreen(nav: NavHostController) {
 
     var from by remember { mutableStateOf("") }
     var to by remember { mutableStateOf("") }
-    var dateStart by remember { mutableStateOf("26/09/2025") }
-    var dateEnd by remember { mutableStateOf("26/09/2025") }
+    var dateStart by remember { mutableStateOf("") }
+    var dateEnd by remember { mutableStateOf("") }
+
+    val allFieldsFilled = from.isNotBlank() && to.isNotBlank()
+
+    val allFieldsEmpty = from.isBlank() && to.isBlank()
+
+    val isSearchEnabled = allFieldsFilled || allFieldsEmpty
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -152,15 +158,24 @@ fun MainScreen(nav: NavHostController) {
             Spacer(Modifier.height(16.dp))
 
             Button(
-                onClick = { nav.navigate("search") },
+                onClick = {
+                    val fromEncoded = java.net.URLEncoder.encode(from.ifBlank { " " }, "UTF-8")
+                    val toEncoded = java.net.URLEncoder.encode(to.ifBlank { " " }, "UTF-8")
+                    val dateStartEncoded = java.net.URLEncoder.encode(dateStart.ifBlank { " " }, "UTF-8")
+                    val dateEndEncoded = java.net.URLEncoder.encode(dateEnd.ifBlank { " " }, "UTF-8")
+                    nav.navigate("search/$fromEncoded/$toEncoded/$dateStartEncoded/$dateEndEncoded")
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp),
+                // ДОБАВЛЯЕМ ENABLED
+                enabled = isSearchEnabled,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF622A3A)
+                    containerColor = Color(0xFF622A3A),
+                    disabledContainerColor = Color.Gray // Цвет, когда кнопка недоступна
                 )
             ) {
-                Text("Найти")
+                Text("Найти", color = Color.White)
             }
 
             Spacer(Modifier.height(24.dp))

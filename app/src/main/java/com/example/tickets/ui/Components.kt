@@ -65,18 +65,37 @@ fun FormField(label: String, value: String, onChange: (String) -> Unit) {
 
 @Composable
 fun DateField(label: String, value: String, onClick: () -> Unit = {}) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = {},
-        modifier = Modifier.fillMaxWidth(),
-        label = { Text(label) },
-        trailingIcon = {
-            Icon(Icons.Default.DateRange, contentDescription = null)
-        },
-        readOnly = true
-    )
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = LocalIndication.current, // Explicitly passing it here fixes the conflict
+                onClick = { onClick }
+            )
+    ) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = {},
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text(label) },
+            trailingIcon = {
+                Icon(Icons.Default.DateRange, contentDescription = null)
+            },
+            readOnly = true,
+            // Важно: enabled = false делает поле визуально доступным,
+            // но игнорирующим ввод, а Box выше перехватывает клик.
+            enabled = false,
+            colors = OutlinedTextFieldDefaults.colors(
+                disabledTextColor = Color.Black,
+                disabledBorderColor = Color.Gray,
+                disabledLabelColor = Color(0xFF622A3A),
+                disabledTrailingIconColor = Color(0xFF622A3A),
+                disabledPlaceholderColor = Color.DarkGray
+            )
+        )
+    }
 }
-
 
 @Composable
 fun PromoItem(title: String, subtitle: String, onClick: () -> Unit) {
@@ -105,7 +124,7 @@ fun PromoBlock(nav: NavHostController) {
             text = "Скидка 10 процентов",
             modifier = Modifier.fillMaxWidth()
         ) {
-            nav.navigate("promo_details/Скидка 10%/57647")
+            nav.navigate("promo_details/Скидка 10 процентов/57647")
         }
 
         PromoCard(
@@ -161,15 +180,24 @@ fun DrawerButton(text: String, onClick: () -> Unit) {
 }
 
 @Composable
-fun PassengerForm(title: String, subtitle: String) {
-
+fun PassengerForm(
+    title: String,
+    subtitle: String,
+    surname: String, onSurnameChange: (String) -> Unit,
+    name: String, onNameChange: (String) -> Unit,
+    gender: String, onGenderChange: (String) -> Unit,
+    birthday: String, onBirthdayChange: (String) -> Unit,
+    docType: String, onDocTypeChange: (String) -> Unit,
+    docNumber: String, onDocNumberChange: (String) -> Unit,
+    phone: String, onPhoneChange: (String) -> Unit,
+    email: String, onEmailChange: (String) -> Unit
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(Color(0xFFD2AC97))
     ) {
         Column(Modifier.padding(16.dp)) {
-
             Text(title, fontSize = 20.sp, fontWeight = FontWeight.Bold)
             Text(subtitle)
 
@@ -177,15 +205,15 @@ fun PassengerForm(title: String, subtitle: String) {
 
             Row {
                 OutlinedTextField(
-                    value = "",
-                    onValueChange = {},
+                    value = surname,
+                    onValueChange = onSurnameChange,
                     modifier = Modifier.weight(1f),
                     placeholder = { Text("Фамилия") }
                 )
                 Spacer(Modifier.width(8.dp))
                 OutlinedTextField(
-                    value = "",
-                    onValueChange = {},
+                    value = name,
+                    onValueChange = onNameChange,
                     modifier = Modifier.weight(1f),
                     placeholder = { Text("Имя") }
                 )
@@ -195,59 +223,55 @@ fun PassengerForm(title: String, subtitle: String) {
 
             Row {
                 OutlinedTextField(
-                    value = "",
-                    onValueChange = {},
+                    value = gender,
+                    onValueChange = onGenderChange,
                     modifier = Modifier.weight(1f),
                     placeholder = { Text("Пол") }
                 )
                 Spacer(Modifier.width(8.dp))
                 OutlinedTextField(
-                    value = "",
-                    onValueChange = {},
+                    value = birthday,
+                    onValueChange = onBirthdayChange,
                     modifier = Modifier.weight(1f),
                     placeholder = { Text("Дата рождения") }
                 )
             }
 
             Spacer(Modifier.height(16.dp))
-
             Text("Документы", fontWeight = FontWeight.Bold)
-
             Spacer(Modifier.height(8.dp))
 
             Row {
                 OutlinedTextField(
-                    value = "",
-                    onValueChange = {},
+                    value = docType,
+                    onValueChange = onDocTypeChange,
                     modifier = Modifier.weight(1f),
                     placeholder = { Text("Паспорт РБ") }
                 )
                 Spacer(Modifier.width(8.dp))
                 OutlinedTextField(
-                    value = "",
-                    onValueChange = {},
+                    value = docNumber,
+                    onValueChange = onDocNumberChange,
                     modifier = Modifier.weight(1f),
                     placeholder = { Text("Номер документа") }
                 )
             }
 
             Spacer(Modifier.height(16.dp))
-
             Text("Контактная информация", fontWeight = FontWeight.Bold)
-
             Spacer(Modifier.height(8.dp))
 
             Row {
                 OutlinedTextField(
-                    value = "",
-                    onValueChange = {},
+                    value = phone,
+                    onValueChange = onPhoneChange,
                     modifier = Modifier.weight(1f),
                     placeholder = { Text("Номер телефона") }
                 )
                 Spacer(Modifier.width(8.dp))
                 OutlinedTextField(
-                    value = "",
-                    onValueChange = {},
+                    value = email,
+                    onValueChange = onEmailChange,
                     modifier = Modifier.weight(1f),
                     placeholder = { Text("Почта") }
                 )
@@ -255,7 +279,6 @@ fun PassengerForm(title: String, subtitle: String) {
         }
     }
 }
-
 
 @Composable
 fun BuyerForm() {
@@ -314,7 +337,7 @@ fun BuyerForm() {
 
 
 @Composable
-fun TicketSummaryCard() {
+fun TicketSummaryCard(route: com.example.tickets.data.entity.RouteEntity) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -330,18 +353,54 @@ fun TicketSummaryCard() {
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Column {
-                    Text("Минск", fontSize = 16.sp, fontWeight = FontWeight.Medium)
-                    Text("12:30  •  5 марта", fontSize = 14.sp, color = Color.Gray)
+                    Text(route.from, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                    Text(
+                        "${route.departureTime}  •  ${route.departureDate}",
+                        fontSize = 14.sp,
+                        color = Color.Gray
+                    )
                 }
                 Column(horizontalAlignment = Alignment.End) {
-                    Text("Брест", fontSize = 16.sp, fontWeight = FontWeight.Medium)
-                    Text("16:50  •  5 марта", fontSize = 14.sp, color = Color.Gray)
+                    Text(route.to, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                    if (route.arrivalTime != null && route.arrivalDate != null) {
+                        Text(
+                            "${route.arrivalTime}  •  ${route.arrivalDate}",
+                            fontSize = 14.sp,
+                            color = Color.Gray
+                        )
+                    }
                 }
             }
 
             Spacer(Modifier.height(12.dp))
 
-            Text("Место: 14  (Автобус №402)", fontSize = 14.sp, color = Color.Gray)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                if (route.trainType != null) {
+                    Text("Тип: ${route.trainType}", fontSize = 14.sp, color = Color.Gray)
+                }
+                if (route.duration != null) {
+                    Text("Длительность: ${route.duration}", fontSize = 14.sp, color = Color.Gray)
+                }
+            }
+            
+            Spacer(Modifier.height(8.dp))
+            
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("Цена: ${route.price}", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF622A3A))
+                if (route.availableSeats > 0) {
+                    Text(
+                        "Свободных мест: ${route.availableSeats}",
+                        fontSize = 14.sp,
+                        color = Color.Gray
+                    )
+                }
+            }
         }
     }
 }
